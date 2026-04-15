@@ -1,9 +1,3 @@
-"""
-RC Discharge Curve Fitter
-Fits V(t) = A * exp(-w * t) + C to time-voltage CSV data,
-then computes capacitance from C_cap = 1 / (w * R).
-"""
-
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 import numpy as np
@@ -167,7 +161,7 @@ class App(tk.Tk):
             return
 
         A_fit, w_fit, C_fit = popt
-        perr = np.sqrt(np.diag(pcov))          # 1-sigma uncertainties
+        perr = np.sqrt(np.diag(pcov))
         A_err, w_err, C_err = perr
 
         # capacitance: C_cap = 1 / (w * R)

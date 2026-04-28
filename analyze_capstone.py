@@ -514,23 +514,40 @@ def main() -> None:
     }
     plot_summary(finals)
 
-    air_area_m2 = math.pi * 0.10**2
+    CALIPER_M = 2e-5  # 0.02 mm caliper uncertainty
+
+    air_radius_m = 0.10
+    air_area_m2 = math.pi * air_radius_m**2
+    air_area_err_m2 = 2.0 * math.pi * air_radius_m * CALIPER_M  # dA/dr = 2πr
     air_thickness_m = 0.0025
+    air_thickness_err_m = CALIPER_M
+
     glass_area_m2 = 0.34 * 0.48
+    glass_area_err_m2 = glass_area_m2 * math.sqrt((CALIPER_M / 0.34) ** 2 + (CALIPER_M / 0.48) ** 2)
     glass_thickness_m = 0.00608
+    glass_thickness_err_m = CALIPER_M
+
     acrylic_area_m2 = 0.48 * 0.33
     acrylic_area_err_m2 = acrylic_area_m2 * math.sqrt((0.005 / 0.48) ** 2 + (0.01 / 0.33) ** 2)
     acrylic_thickness_m = 0.0070
+    acrylic_thickness_err_m = CALIPER_M
 
     dielectric_results = {
-        "Air": dielectric_permittivity(air_mean, air_mean_err, air_area_m2, air_thickness_m),
-        "Glass": dielectric_permittivity(glass[0], glass[1], glass_area_m2, glass_thickness_m),
+        "Air": dielectric_permittivity(
+            air_mean, air_mean_err, air_area_m2, air_thickness_m,
+            area_err_m2=air_area_err_m2, thickness_err_m=air_thickness_err_m,
+        ),
+        "Glass": dielectric_permittivity(
+            glass[0], glass[1], glass_area_m2, glass_thickness_m,
+            area_err_m2=glass_area_err_m2, thickness_err_m=glass_thickness_err_m,
+        ),
         "Acrylic": dielectric_permittivity(
             acrylic[0],
             acrylic[1],
             acrylic_area_m2,
             acrylic_thickness_m,
             area_err_m2=acrylic_area_err_m2,
+            thickness_err_m=acrylic_thickness_err_m,
         ),
     }
     air_frequency_dielectric = dielectric_permittivity(
@@ -538,6 +555,8 @@ def main() -> None:
         air_frequency[1],
         air_area_m2,
         air_thickness_m,
+        area_err_m2=air_area_err_m2,
+        thickness_err_m=air_thickness_err_m,
     )
     plot_permittivity_summary(
         {label: (values[2], values[3]) for label, values in dielectric_results.items()}
@@ -582,16 +601,18 @@ def main() -> None:
     print("\nPERMITTIVITY RESULTS")
     print(
         "Air geometry: "
-        f"A={air_area_m2:.5f} m^2, d={air_thickness_m:.4f} m"
+        f"A={format_pm(air_area_m2, air_area_err_m2, digits=6)} m^2, "
+        f"d={format_pm(air_thickness_m, air_thickness_err_m, digits=5)} m"
     )
     print(
         "Glass geometry: "
-        f"A={glass_area_m2:.4f} m^2, d={glass_thickness_m:.5f} m"
+        f"A={format_pm(glass_area_m2, glass_area_err_m2, digits=5)} m^2, "
+        f"d={format_pm(glass_thickness_m, glass_thickness_err_m, digits=6)} m"
     )
     print(
         "Acrylic geometry: "
         f"A={acrylic_area_m2:.4f} +/- {acrylic_area_err_m2:.4f} m^2, "
-        f"d={acrylic_thickness_m:.4f} m"
+        f"d={format_pm(acrylic_thickness_m, acrylic_thickness_err_m, digits=5)} m"
     )
     for label, values in dielectric_results.items():
         epsilon, epsilon_err, kappa, kappa_err = values

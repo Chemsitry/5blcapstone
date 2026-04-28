@@ -517,10 +517,22 @@ def main() -> None:
     CALIPER_M = 2e-5  # 0.02 mm caliper uncertainty
 
     air_radius_m = 0.10
-    air_area_m2 = math.pi * air_radius_m**2
-    air_area_err_m2 = 2.0 * math.pi * air_radius_m * CALIPER_M  # dA/dr = 2πr
     air_thickness_m = 0.0025
     air_thickness_err_m = CALIPER_M
+
+    # Nominal (uncorrected) circular plate area
+    air_area_m2 = math.pi * air_radius_m**2
+    air_area_err_m2 = 2.0 * math.pi * air_radius_m * CALIPER_M  # dA/dr = 2*pi*r
+
+    # Kirchhoff fringe correction: r_eff = r + (d/pi)*(ln(2*pi*r/d) + 1 + ln(2))
+    # Valid for d/r << 1 (here d/r = 0.025)
+    air_radius_eff_m = air_radius_m + (air_thickness_m / math.pi) * (
+        math.log(2.0 * math.pi * air_radius_m / air_thickness_m) + 1.0 + math.log(2.0)
+    )
+    air_area_eff_m2 = math.pi * air_radius_eff_m**2
+    # dr_eff/dr = 1 + (d/pi)/r; propagate through dA_eff = 2*pi*r_eff * (dr_eff/dr) * sigma_r
+    d_reff_dr = 1.0 + (air_thickness_m / math.pi) / air_radius_m
+    air_area_eff_err_m2 = 2.0 * math.pi * air_radius_eff_m * d_reff_dr * CALIPER_M
 
     glass_area_m2 = 0.34 * 0.48
     glass_area_err_m2 = glass_area_m2 * math.sqrt((CALIPER_M / 0.34) ** 2 + (CALIPER_M / 0.48) ** 2)
@@ -533,7 +545,11 @@ def main() -> None:
     acrylic_thickness_err_m = CALIPER_M
 
     dielectric_results = {
-        "Air": dielectric_permittivity(
+        "Air (Kirchhoff)": dielectric_permittivity(
+            air_mean, air_mean_err, air_area_eff_m2, air_thickness_m,
+            area_err_m2=air_area_eff_err_m2, thickness_err_m=air_thickness_err_m,
+        ),
+        "Air (nominal)": dielectric_permittivity(
             air_mean, air_mean_err, air_area_m2, air_thickness_m,
             area_err_m2=air_area_err_m2, thickness_err_m=air_thickness_err_m,
         ),
@@ -553,13 +569,22 @@ def main() -> None:
     air_frequency_dielectric = dielectric_permittivity(
         air_frequency[0],
         air_frequency[1],
+        air_area_eff_m2,
+        air_thickness_m,
+        area_err_m2=air_area_eff_err_m2,
+        thickness_err_m=air_thickness_err_m,
+    )
+    air_frequency_dielectric_nominal = dielectric_permittivity(
+        air_frequency[0],
+        air_frequency[1],
         air_area_m2,
         air_thickness_m,
         area_err_m2=air_area_err_m2,
         thickness_err_m=air_thickness_err_m,
     )
     plot_permittivity_summary(
-        {label: (values[2], values[3]) for label, values in dielectric_results.items()}
+        {label: (values[2], values[3]) for label, values in dielectric_results.items()
+         if label != "Air (nominal)"}
     )
 
     print("FIT RESULTS")
@@ -600,9 +625,15 @@ def main() -> None:
 
     print("\nPERMITTIVITY RESULTS")
     print(
-        "Air geometry: "
+        "Air geometry (nominal): "
         f"A={format_pm(air_area_m2, air_area_err_m2, digits=6)} m^2, "
         f"d={format_pm(air_thickness_m, air_thickness_err_m, digits=5)} m"
+    )
+    print(
+        "Air geometry (Kirchhoff): "
+        f"r_eff={air_radius_eff_m*100:.4f} cm, "
+        f"A_eff={format_pm(air_area_eff_m2, air_area_eff_err_m2, digits=6)} m^2 "
+        f"(+{(air_area_eff_m2 - air_area_m2) / air_area_m2 * 100:.2f}%)"
     )
     print(
         "Glass geometry: "
@@ -621,9 +652,14 @@ def main() -> None:
             f"kappa={format_pm(kappa, kappa_err, digits=2)}"
         )
     print(
-        "Air from frequency response: "
+        "Air freq response (Kirchhoff): "
         f"epsilon={format_pm(air_frequency_dielectric[0], air_frequency_dielectric[1], digits=14)} F/m, "
         f"kappa={format_pm(air_frequency_dielectric[2], air_frequency_dielectric[3], digits=2)}"
+    )
+    print(
+        "Air freq response (nominal): "
+        f"epsilon={format_pm(air_frequency_dielectric_nominal[0], air_frequency_dielectric_nominal[1], digits=14)} F/m, "
+        f"kappa={format_pm(air_frequency_dielectric_nominal[2], air_frequency_dielectric_nominal[3], digits=2)}"
     )
 
 
